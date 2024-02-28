@@ -309,7 +309,7 @@ export const GCodeConversor: React.FC = () => {
                       label="Utilizar otimização de movimentos circulares"
                     />
                   </FormGroup>
-                  <FormGroup>
+                  {/*<FormGroup>
                     <FormControlLabel
                       control={
                         <Checkbox
@@ -321,7 +321,7 @@ export const GCodeConversor: React.FC = () => {
                       }
                       label="Utilizar otimização de pontos próximos"
                     />
-                  </FormGroup>
+                  </FormGroup>*/}
                   <TextField
                     label="Velocidade dos movimentos"
                     value={speed}
