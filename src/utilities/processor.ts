@@ -263,20 +263,66 @@ export const processGCode = (
 
   for (let i = 0; i < movementCoordinates.length; i++) {
     const current = movementCoordinates[i];
-    const previous = movementCoordinates[i - 1];
 
     if (current.X === undefined) {
-      current.X = previous?.X;
+      for (let j = i; j >= 0; j--) {
+        const previous = movementCoordinates[j];
+
+        if (previous.X !== undefined) {
+          current.X = previous.X;
+          break;
+        }
+      }
+      for (let j = i; j < movementCoordinates.length; j++) {
+        const next = movementCoordinates[j];
+
+        if (next.X !== undefined) {
+          current.X = next.X;
+          break;
+        }
+      }
     }
 
     if (current.Y === undefined) {
-      current.Y = previous?.Y;
+      for (let j = i; j >= 0; j--) {
+        const previous = movementCoordinates[j];
+
+        if (previous.Y !== undefined) {
+          current.Y = previous.Y;
+          break;
+        }
+      }
+      for (let j = i; j < movementCoordinates.length; j++) {
+        const next = movementCoordinates[j];
+
+        if (next.Y !== undefined) {
+          current.Y = next.Y;
+          break;
+        }
+      }
     }
 
     if (current.Z === undefined) {
-      current.Z = previous?.Z;
+      for (let j = i; j >= 0; j--) {
+        const previous = movementCoordinates[j];
+
+        if (previous.Z !== undefined) {
+          current.Z = previous.Z;
+          break;
+        }
+      }
+      for (let j = i; j < movementCoordinates.length; j++) {
+        const next = movementCoordinates[j];
+
+        if (next.Z !== undefined) {
+          current.Z = next.Z;
+          break;
+        }
+      }
     }
   }
+
+  console.log(movementCoordinates.filter((c) => c.X === undefined || c.Y === undefined || c.Z === undefined));
 
   const coordinateSet = formatCoordinates(movementCoordinates);
   let movementSet: string[] = [];
