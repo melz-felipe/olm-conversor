@@ -3,10 +3,10 @@ import Spline from "spline-interpolator";
 
 // Definição das preferências de processamento constantes para o algoritmo
 
-const SIMPLIFICATION_ERROR_MARGIN = 0.5; // Margem de erro para simplificação de spline
-const MAX_SPLINE_POINT_DISTANCE = 2; // Distância máxima entre pontos de spline
-const MAX_SPLINE_TOTAL_DISTANCE = 20; // Distância total máxima de spline
-const MIN_SPLINE_POINTS = 3; // Número mínimo de pontos para spline
+const SIMPLIFICATION_ERROR_MARGIN = 1.5; // Margem de erro para simplificação de spline
+const MAX_SPLINE_POINT_DISTANCE = 20; // Distância máxima entre pontos de spline
+const MAX_SPLINE_TOTAL_DISTANCE = 80; // Distância total máxima de spline
+const MIN_SPLINE_POINTS = 4; // Número mínimo de pontos para spline
 const MAX_SPLINE_POINTS = 12; // Número máximo de pontos para spline
 const MAX_LINES = 50000; // Número máximo de linhas de GCode
 const VERTICAL_OFFSET = 0; // Offset vertical para movimentos de Z
