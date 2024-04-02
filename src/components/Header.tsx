@@ -1,3 +1,5 @@
+// Elemento do cabeçalho, que é fixo no topo da página
+
 import styled from "styled-components";
 
 const Container = styled.div`

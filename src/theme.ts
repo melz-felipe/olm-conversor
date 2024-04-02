@@ -1,3 +1,5 @@
+// Configurações de tema, fontes e cores
+
 import { createTheme } from "@mui/material";
 
 const theme = createTheme({

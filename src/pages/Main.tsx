@@ -1,6 +1,8 @@
+// Página da home
+
 import styled from "styled-components";
 import { Layout } from "../components/Layout";
-import { List, ListItem, Typography } from "@mui/material";
+import { Typography } from "@mui/material";
 
 const Content = styled.div`
   overflow-y: auto;

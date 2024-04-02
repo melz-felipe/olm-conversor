@@ -1,13 +1,15 @@
 // @ts-ignore
 import Spline from "spline-interpolator";
 
-const SIMPLIFICATION_ERROR_MARGIN = 0.5;
-const MAX_SPLINE_POINT_DISTANCE = 2;
-const MAX_SPLINE_TOTAL_DISTANCE = 20;
-const MIN_SPLINE_POINTS = 3;
-const MAX_SPLINE_POINTS = 12;
-const MAX_LINES = 50000;
-const VERTICAL_OFFSET = 700;
+// Definição das preferências de processamento constantes para o algoritmo
+
+const SIMPLIFICATION_ERROR_MARGIN = 0.5; // Margem de erro para simplificação de spline
+const MAX_SPLINE_POINT_DISTANCE = 2; // Distância máxima entre pontos de spline
+const MAX_SPLINE_TOTAL_DISTANCE = 20; // Distância total máxima de spline
+const MIN_SPLINE_POINTS = 3; // Número mínimo de pontos para spline
+const MAX_SPLINE_POINTS = 12; // Número máximo de pontos para spline
+const MAX_LINES = 50000; // Número máximo de linhas de GCode
+const VERTICAL_OFFSET = 0; // Offset vertical para movimentos de Z
 
 interface Coordinates {
   originalIndex: number;
@@ -17,10 +19,13 @@ interface Coordinates {
   Z?: number;
 }
 
+// Expressão regular para captura de coordenadas de movimento
 const coordinateRegex = /([XYZ])\s*([-\d.]+)/g;
-const baseCoordinate = "C00000=455.277,520.116,-433.365,-180.00,0.00,0.00";
+
+// Movimento base para inicialização do programa (consome a coordenada inicial)
 const baseMovement = "MOVJ C00000 VJ=50.00 PL=0";
 
+// Função para captura de movimentos G1 e G0 de um conjunto de linhas de GCode
 export const getG1G0 = (gcodeLines: string[]): string[] => {
   let result: string[] = [];
 
@@ -34,6 +39,7 @@ export const getG1G0 = (gcodeLines: string[]): string[] => {
   return result;
 };
 
+// Função para cálculo da distância entre dois pontos
 const calculateDistanceBetweenPoints = (
   point1: Coordinates,
   point2: Coordinates
@@ -44,6 +50,7 @@ const calculateDistanceBetweenPoints = (
   return Math.sqrt(x * x + y * y);
 };
 
+// Função para cálculo da distância total entre múltiplos pontos
 const calculateDistanceBetweenMultiplePoints = (
   points: Coordinates[]
 ): number => {
@@ -56,9 +63,18 @@ const calculateDistanceBetweenMultiplePoints = (
   return distance;
 };
 
-const formatCoordinates = (coordinates: Coordinates[]): string[] => {
+// Função para formatação de coordenadas para o formato de arquivo de movimento
+// Ex.: C00000=X,Y,Z,-180.00,0.00,0.00
+// Aqui os ângulos de rotação são fixos em -180.00, 0.00 e 0.00
+
+const formatCoordinates = (
+  coordinates: Coordinates[],
+  initialCoordinates: { x: number; y: number; z: number }
+): string[] => {
   return [
-    baseCoordinate,
+    `C00000=${initialCoordinates.x.toFixed(3)},${initialCoordinates.y.toFixed(
+      3
+    )},${initialCoordinates.z.toFixed(3)},-180.00,0.00,0.00`,
     ...coordinates.map((coord) => {
       const RX = -180.0;
       const RY = -0.0;
@@ -77,6 +93,10 @@ const formatCoordinates = (coordinates: Coordinates[]): string[] => {
   ];
 };
 
+// Função para formatação de movimento linear entre coordenadas de movimento
+// Ex.: MOVL C00001 V=50.0 PL=0
+// Aqui a velocidade de movimento é baseada nas preferências do usuário
+
 const formatLinearMovement = (
   coordinate: Coordinates,
   options: { speed: number }
@@ -87,6 +107,12 @@ const formatLinearMovement = (
     .toString()
     .padStart(5, "0")} V=${speed.toFixed(1)} PL=0`;
 };
+
+// Função para formatação de movimento de spline entre coordenadas de movimento
+// Ex.: MOVS C00001 V=50.0 PL=0
+// Ex.: MOVS C00002 V=50.0 PL=0
+// Aqui a velocidade de movimento é baseada nas preferências do usuário
+// O movimento de spline é utilizado para simplificação de movimentos lineares em curvas suaves
 
 const formatSplineMovement = (
   coordinate: Coordinates,
@@ -99,23 +125,33 @@ const formatSplineMovement = (
     .padStart(5, "0")} V=${speed.toFixed(1)} PL=0`;
 };
 
+// Função para avaliação da possibilidade de simplificação de spline entre coordenadas de movimento
+
 const evaluateSplinePossibility = (coordinates: Coordinates[]): boolean => {
+  // Verifica se todas as coordenadas possuem valores de X e Y
   if (!coordinates.every((c) => c.X !== undefined && c.Y !== undefined)) {
     return false;
   }
 
+  // Obtém o índice do ponto médio das coordenadas
   const middleIndex = Math.floor(coordinates.length / 2);
+
+  // Simplifica as coordenadas utilizando os pontos inicial, médio e final
+  // A spline é calculada a partir destes pontos, uma vez que a definição mínima
+  // de uma spline é através de três pontos no GP88
   const simplifiedCoordinates = [
     coordinates[0],
     coordinates[middleIndex],
     coordinates[coordinates.length - 1],
   ];
 
+  // Calcula a distância entre os pontos inicial e final
   const distance = calculateDistanceBetweenPoints(
     coordinates[coordinates.length - 2],
     coordinates[coordinates.length - 1]
   );
 
+  // Calcula a distância entre os pontos de spline
   const distancePointByPoint = coordinates.map((c, index) => {
     if (index === 0) {
       return 0;
@@ -124,57 +160,74 @@ const evaluateSplinePossibility = (coordinates: Coordinates[]): boolean => {
     return calculateDistanceBetweenPoints(coordinates[index - 1], c);
   });
 
+  // Verifica se a distância entre os pontos de spline é menor que o limite
   if (distancePointByPoint.some((d) => d > MAX_SPLINE_POINT_DISTANCE)) {
     return false;
   }
 
   const totalDistance = calculateDistanceBetweenMultiplePoints(coordinates);
 
+  // Verifica se a distância total entre os pontos de spline é menor que o limite
   if (totalDistance > MAX_SPLINE_TOTAL_DISTANCE) {
     return false;
   }
 
+  // Verifica se a distância entre os pontos de spline é menor que o limite
   if (distance > MAX_SPLINE_POINT_DISTANCE || Number.isNaN(distance)) {
     return false;
   }
 
+  // Isola os valores de X e Y das coordenadas em arrays separados
+  // Contempla todas as coordenadas dos parâmetros
   const x = coordinates.map((c) => c.X!);
   const y = coordinates.map((c) => c.Y!);
 
+  // Isola os valores de X e Y das coordenadas simplificadas em arrays separados
+  // Contempla todas as coordenadas dos parâmetros
   const simplifiedX = simplifiedCoordinates.map((c) => c.X!);
   const simplifiedY = simplifiedCoordinates.map((c) => c.Y!);
 
+  // Cria uma nova spline a partir dos valores simplificados, utilizando a biblioteca spline-interpolator
   const simplifiedSpline = new Spline(simplifiedX, simplifiedY);
 
+  // Itera sobre todos os valores de X e Y das coordenadas
   for (let i = 0; i < x.length; i++) {
     const xValue = x[i];
     const yValue = y[i];
 
+    // Calcula o valor de Y da spline simplificada para o valor de X atual
     const simplifiedSplineY = simplifiedSpline.interpolate(xValue);
 
+    // Verifica se o valor de Y da spline simplificada é diferente do valor de Y atual
+    // Se a diferença for maior que a margem de erro, a simplificação não é possível
+    // A margem de erro é definida pelas preferências do usuário
     if (Math.abs(simplifiedSplineY - yValue) > SIMPLIFICATION_ERROR_MARGIN) {
       return false;
     }
   }
 
+  // Se todas as verificações passarem, a simplificação é possível
   return true;
 };
 
+// Função para processamento de GCode
 export const processGCode = (
   gcodeLines: string[],
   header: string,
   footer: string,
   preferences: {
     useCircleOptimization: boolean;
-    useNearPointsOptimization: boolean;
+    initialCoordinates: { x: number; y: number; z: number };
     speed: number;
   }
 ): string[] => {
-  const { useCircleOptimization, useNearPointsOptimization, speed } =
-    preferences;
+  // Desestruturação das preferências de processamento
+  const { useCircleOptimization, initialCoordinates, speed } = preferences;
 
+  // Criação de um conjunto de coordenadas de movimento a partir das linhas de GCode
   const g1g0 = getG1G0(gcodeLines.splice(0, MAX_LINES));
 
+  // Criação de um conjunto de coordenadas de movimento a partir das linhas de GCode
   let movementCoordinates: Coordinates[] = g1g0.map((line, index) => {
     const coordinates: Coordinates = {
       originalIndex: index,
@@ -182,43 +235,60 @@ export const processGCode = (
     };
     let match;
 
+    // Itera sobre todas as coordenadas de movimento da linha de GCode
+    // Utiliza uma expressão regular para captura de coordenadas
     while ((match = coordinateRegex.exec(line)) !== null) {
       const [_, axis, value] = match;
       coordinates[axis as keyof Coordinates] = parseFloat(value);
     }
 
+    // Retorna as coordenadas de movimento (objeto com chaves X, Y e Z)
     return coordinates;
   });
 
+  // Inicializa um conjunto de splines vazio
   let splines: [number, number, number][] = [];
 
+  // Verifica se a otimização de círculos está habilitada
   if (useCircleOptimization) {
+    // Itera sobre todas as coordenadas de movimento
     for (
       let i = 0;
-      i < movementCoordinates.length && i < 2000;
+      i < movementCoordinates.length && i < MAX_LINES;
       () => undefined
     ) {
       let splineLength = 0;
 
+      // Itera sobre todas as possíveis combinações de pontos de spline
+      // Verifica se a simplificação de spline é possível
+      // A simplificação de spline é utilizada para reduzir a quantidade de movimentos lineares
+      // em curvas suaves
       for (let j = MIN_SPLINE_POINTS - 1; j <= MAX_SPLINE_POINTS; j = j + 1) {
+        // Obtém o próximo ponto do conjunto de coordenadas de movimento, vamos de i até i + j
         const next = movementCoordinates[i + j];
 
+        // Verifica se o próximo ponto é indefinido
         if (next === undefined) {
           break;
         }
 
+        // Cria um subconjunto de coordenadas de movimento a partir do conjunto principal
         const subSet = JSON.parse(JSON.stringify(movementCoordinates)).slice(
           i,
           i + j + 1
         );
 
+        // Verifica se a simplificação de spline é possível
         if (!evaluateSplinePossibility(subSet)) {
           break;
         }
 
+        // Se a simplificação de spline for possível, atualiza o comprimento da spline,
+        // continua até encontrar o maior comprimento possível de spline (em número de pontos)
         splineLength = j;
       }
 
+      // Se o comprimento da spline for maior que 1, adiciona a spline ao conjunto de splines
       if (splineLength > 1) {
         i += splineLength;
 
@@ -226,17 +296,21 @@ export const processGCode = (
 
         splines.push([i, middlePoint, i + splineLength]);
       } else {
+        // Se a simplificação de spline não for possível, continua para o próximo ponto
         i++;
       }
     }
   }
 
+  // Filtra as coordenadas de movimento contidas nas splines
   const coordinatesContainedInSpline = movementCoordinates.filter(
     (_, index) => {
       return splines.some((s) => index >= s[0] && index <= s[2]);
     }
   );
 
+  // Filtra as coordenadas de movimento contidas nas splines para remoção
+  // Mantém apenas os pontos inicial, final e médio das splines
   const coordinatesContainedInSplineToKill = movementCoordinates.filter(
     (_, index) => {
       return splines.some(
@@ -250,10 +324,12 @@ export const processGCode = (
     }
   );
 
+  // Remove as coordenadas de movimento contidas nas splines para remoção
   movementCoordinates = movementCoordinates.filter(
     (coord) => !coordinatesContainedInSplineToKill.includes(coord)
   );
 
+  // Atualiza os índices das coordenadas de movimento após a remoção
   movementCoordinates = movementCoordinates.map((coord, index) => {
     return {
       ...coord,
@@ -261,6 +337,8 @@ export const processGCode = (
     };
   });
 
+  // Como o GCode pode não conter algumas coordenadas, preenche as lacunas
+  // com os valores das coordenadas anteriores e posteriores
   for (let i = 0; i < movementCoordinates.length; i++) {
     const current = movementCoordinates[i];
 
@@ -322,30 +400,38 @@ export const processGCode = (
     }
   }
 
-  console.log(movementCoordinates.filter((c) => c.X === undefined || c.Y === undefined || c.Z === undefined));
-
-  const coordinateSet = formatCoordinates(movementCoordinates);
+  // Formata as coordenadas de movimento para o formato de arquivo de movimento
+  // Formata os movimentos lineares e de spline
+  const coordinateSet = formatCoordinates(
+    movementCoordinates,
+    initialCoordinates
+  );
   let movementSet: string[] = [];
 
   for (const movementCoordinate of movementCoordinates) {
+    // Verifica se a coordenada de movimento está contida nas splines
     if (
       coordinatesContainedInSpline.find(
         (item) => item.originalIndex === movementCoordinate.originalIndex
       )
     ) {
+      // Se estiver contida, adiciona um movimento de spline
       movementSet.push(
         formatSplineMovement(movementCoordinate, { speed: speed })
       );
     } else {
+      // Se não estiver contida, adiciona um movimento linear
       movementSet.push(
         formatLinearMovement(movementCoordinate, { speed: speed })
       );
     }
   }
 
+  // Formata o cabeçalho e o rodapé do arquivo de movimento
   const headerLines = header.split("\n");
   const footerLines = footer.split("\n");
 
+  // Concatena todas as partes do arquivo de movimento
   let result: string[] = [
     ...headerLines,
     ...coordinateSet,
@@ -355,5 +441,6 @@ export const processGCode = (
     ...footerLines,
   ];
 
+  // Retorna uma lista de strings contendo o arquivo de movimento
   return result;
 };

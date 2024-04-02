@@ -1,3 +1,5 @@
+// Arquivo base com as configurações iniciais do projeto
+
 import { BrowserRouter } from "react-router-dom";
 import { ThemeProvider } from "@mui/material";
 import { ThemeProvider as StyledThemeProvider } from "styled-components";

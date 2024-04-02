@@ -1,3 +1,5 @@
+// Elemento da barra de navegação
+
 import { Button, Menu, MenuItem } from "@mui/material";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";

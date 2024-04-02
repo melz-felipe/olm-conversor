@@ -1,9 +1,9 @@
+// Arquivo responsável por renderizar a página de conversão de arquivos .gcode para o formato do Motoman GP88.
+
 import {
   Alert,
+  Box,
   Button,
-  Card,
-  CardContent,
-  CardHeader,
   Checkbox,
   FormControlLabel,
   FormGroup,
@@ -18,6 +18,8 @@ import { useEffect, useMemo, useState } from "react";
 import { Layout } from "../components/Layout";
 import { GCodeViewer } from "react-gcode-viewer";
 import { processGCode } from "../utilities/processor";
+
+// Definição do estilo dos componentes
 
 const StyledProgress = styled(LinearProgress)`
   height: 24px !important;
@@ -41,10 +43,10 @@ const DropContainer = styled.div`
 `;
 
 const Wrapper = styled.div`
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  display: flex;
   justify-content: center;
   flex: 1;
+  min-height: 0;
 `;
 
 const ContentLeft = styled.div`
@@ -54,6 +56,7 @@ const ContentLeft = styled.div`
   display: flex;
   gap: 12px;
   flex-direction: column;
+  min-height: 0;
   overflow-y: auto;
 `;
 
@@ -84,11 +87,33 @@ const RightContentContainerStepTwo = styled.div`
 
 const ContentWrapper = styled(Paper)`
   padding: 12px;
-  max-height: 140px;
+  min-height: 140px;
   overflow-y: auto;
 `;
 
+const RowContainer = styled(Box)`
+  display: flex;
+  flex-direction: row;
+  gap: 12px;
+`;
+
+// Cabeçalho padrão para o arquivo de saída, contendo as configurações iniciais do manipulador (não é necessário alterar, não são comentários)
+
+const baseHeader = `/JOB
+//NAME output
+//POS
+///NPOS 1745,0,0,0,0,0
+///TOOL 10
+///POSTYPE PULSE
+///PULSE
+///TOOL 10
+///POSTYPE BASE
+///RECTAN
+///RCONF 0,0,0,0,0,0,0,0`;
+
 export const GCodeConversor: React.FC = () => {
+  // Definição dos estados do componente
+
   const [currentStep, setCurrentStep] = useState<number>(0);
   const [url, setUrl] = useState<string>("");
   const [file, setFile] = useState<File | null>(null);
@@ -96,12 +121,15 @@ export const GCodeConversor: React.FC = () => {
   const [lines, setLines] = useState<string[]>([]);
   const [useCircleOptimization, setUseCircleOptimization] =
     useState<boolean>(false);
-  const [useNearPointsOptimization, setUseNearPointsOptimization] =
-    useState<boolean>(false);
   const [speed, setSpeed] = useState<string>("100");
-  const [header, setHeader] = useState<string>("");
+  const [header, setHeader] = useState<string>(baseHeader);
   const [footer, setFooter] = useState<string>("END");
   const [finalResult, setFinalResult] = useState<string[] | null>(null);
+  const [initialCoordinates, setInitialCoordinates] = useState<{
+    x: number;
+    y: number;
+    z: number;
+  }>({ x: 500, y: 500, z: 500 });
 
   const { acceptedFiles, getRootProps, getInputProps } = useDropzone({
     maxFiles: 1,
@@ -111,6 +139,11 @@ export const GCodeConversor: React.FC = () => {
     setFile(null);
     setUrl("");
   };
+
+  // Função para processar o arquivo .gcode, lendo o arquivo e processando as linhas
+  // O processamento é feito em chunks de 16KB para evitar travamentos no navegador
+  // O progresso do carregamento é exibido em uma barra de progresso
+  // Após o carregamento, as linhas são armazenadas no estado do componente
 
   const parseGCodeFile = async (file: File) => {
     const chunkSize = 1024 * 16;
@@ -140,12 +173,10 @@ export const GCodeConversor: React.FC = () => {
     readChunk(0);
   };
 
+  // Funções para manipular as preferências de processamento do arquivo .gcode
+
   const handleCheckUseCircleOptimization = () => {
     setUseCircleOptimization(!useCircleOptimization);
-  };
-
-  const handleCheckUseNearPointsOptimization = () => {
-    setUseNearPointsOptimization(!useNearPointsOptimization);
   };
 
   const handleChangeSpeed = (
@@ -156,6 +187,20 @@ export const GCodeConversor: React.FC = () => {
     setSpeed(cleanedValue);
   };
 
+  const handleChangeInitialCoordinates = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
+    axis: "x" | "y" | "z"
+  ) => {
+    const cleanedValue = e.target.value.replace(/[^0-9]/g, "");
+
+    setInitialCoordinates({
+      ...initialCoordinates,
+      [axis]: Number(cleanedValue),
+    });
+  };
+
+  // Função para processar o arquivo .gcode, gerando o arquivo de saída no formato do Motoman GP88
+
   const handleConfirmFirstStep = async () => {
     setCurrentStep(1);
 
@@ -165,13 +210,15 @@ export const GCodeConversor: React.FC = () => {
     }
   };
 
+  // Função para resetar o processo de conversão
+
   const handleResetProcess = () => {
     setCurrentStep(0);
     setLines([]);
     setUseCircleOptimization(false);
-    setUseNearPointsOptimization(false);
     setFinalResult(null);
     setSpeed("100");
+    setInitialCoordinates({ x: 500, y: 500, z: 500 });
     setHeader("");
     setFooter("END");
   };
@@ -180,6 +227,8 @@ export const GCodeConversor: React.FC = () => {
     setCurrentStep(1);
     setFinalResult(null);
   };
+
+  // Função para baixar o arquivo de saída, aqui é possível definir o nome do arquivo e o tipo de arquivo
 
   const handleDownloadFile = () => {
     if (finalResult) {
@@ -198,13 +247,15 @@ export const GCodeConversor: React.FC = () => {
   const handleConfirmSecondStep = () => {
     const result = processGCode(lines, header, footer, {
       useCircleOptimization,
-      useNearPointsOptimization,
       speed: Number(speed || "100"),
+      initialCoordinates,
     });
 
     setFinalResult(result);
     setCurrentStep(2);
   };
+
+  // Atualização do estado do arquivo e da URL ao carregar um novo arquivo
 
   useEffect(() => {
     if (acceptedFiles.length > 0) {
@@ -222,6 +273,8 @@ export const GCodeConversor: React.FC = () => {
     return lines.slice(0, 100);
   }, [lines]);
 
+  // Renderização do componente
+
   return (
     <Layout>
       <Wrapper>
@@ -232,15 +285,7 @@ export const GCodeConversor: React.FC = () => {
                 Conversor de GCode para Motoman GP88
               </Typography>
               <Typography>
-                Inicie carregando o arquivo .gcode gerado pelo Cura.
-              </Typography>
-              <Typography>
-                Os parâmetros sugeridos para o slicer são os seguintes:
-                <ul>
-                  <li>Parâmetro 1: 5mm</li>
-                  <li>Parâmetro 2: 5mm</li>
-                  <li>Parâmetro 3: 5mm</li>
-                </ul>
+                Inicie carregando o arquivo .gcode gerado pelo Ultimaker Cura.
               </Typography>
               <DropContainer {...getRootProps({ className: "dropzone" })}>
                 <input {...getInputProps()} />
@@ -309,34 +354,41 @@ export const GCodeConversor: React.FC = () => {
                       label="Utilizar otimização de movimentos circulares"
                     />
                   </FormGroup>
-                  {/*<FormGroup>
-                    <FormControlLabel
-                      control={
-                        <Checkbox
-                          checked={useNearPointsOptimization}
-                          onChange={() =>
-                            handleCheckUseNearPointsOptimization()
-                          }
-                        />
-                      }
-                      label="Utilizar otimização de pontos próximos"
-                    />
-                  </FormGroup>*/}
                   <TextField
                     label="Velocidade dos movimentos"
                     value={speed}
                     onChange={(e) => handleChangeSpeed(e)}
                   />
+                  <RowContainer>
+                    <TextField
+                      label="Coordenada X inicial"
+                      value={initialCoordinates.x}
+                      onChange={(e) => handleChangeInitialCoordinates(e, "x")}
+                      fullWidth
+                    />
+                    <TextField
+                      label="Coordenada Y inicial"
+                      value={initialCoordinates.y}
+                      onChange={(e) => handleChangeInitialCoordinates(e, "y")}
+                      fullWidth
+                    />
+                    <TextField
+                      label="Coordenada Z inicial"
+                      value={initialCoordinates.z}
+                      onChange={(e) => handleChangeInitialCoordinates(e, "z")}
+                      fullWidth
+                    />
+                  </RowContainer>
                   <TextField
                     multiline
-                    rows={2}
+                    rows={5}
                     label="Cabeçalho do arquivo de saída"
                     value={header}
                     onChange={(e) => setHeader(e.target.value)}
                   />
                   <TextField
                     multiline
-                    rows={2}
+                    rows={5}
                     label="Rodapé do arquivo de saída"
                     value={footer}
                     onChange={(e) => setFooter(e.target.value)}
