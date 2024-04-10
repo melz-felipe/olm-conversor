@@ -130,6 +130,11 @@ export const GCodeConversor: React.FC = () => {
     y: number;
     z: number;
   }>({ x: 500, y: 500, z: 500 });
+  const [offsetCoordinates, setOffsetCoordinates] = useState<{
+    x: number;
+    y: number;
+    z: number;
+  }>({ x: 500, y: 500, z: 0 });
 
   const { acceptedFiles, getRootProps, getInputProps } = useDropzone({
     maxFiles: 1,
@@ -199,6 +204,18 @@ export const GCodeConversor: React.FC = () => {
     });
   };
 
+  const handleChangeOffsetCoordinates = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
+    axis: "x" | "y" | "z"
+  ) => {
+    const cleanedValue = e.target.value.replace(/[^0-9]/g, "");
+
+    setOffsetCoordinates({
+      ...offsetCoordinates,
+      [axis]: Number(cleanedValue),
+    });
+  }
+
   // Função para processar o arquivo .gcode, gerando o arquivo de saída no formato do Motoman GP88
 
   const handleConfirmFirstStep = async () => {
@@ -249,6 +266,7 @@ export const GCodeConversor: React.FC = () => {
       useCircleOptimization,
       speed: Number(speed || "100"),
       initialCoordinates,
+      offsetCoordinates,
     });
 
     setFinalResult(result);
@@ -376,6 +394,26 @@ export const GCodeConversor: React.FC = () => {
                       label="Coordenada Z inicial"
                       value={initialCoordinates.z}
                       onChange={(e) => handleChangeInitialCoordinates(e, "z")}
+                      fullWidth
+                    />
+                  </RowContainer>
+                  <RowContainer>
+                    <TextField
+                      label="Offset X"
+                      value={offsetCoordinates.x}
+                      onChange={(e) => handleChangeOffsetCoordinates(e, "x")}
+                      fullWidth
+                    />
+                    <TextField
+                      label="Offset Y"
+                      value={offsetCoordinates.y}
+                      onChange={(e) => handleChangeOffsetCoordinates(e, "y")}
+                      fullWidth
+                    />
+                    <TextField
+                      label="Offset Z"
+                      value={offsetCoordinates.z}
+                      onChange={(e) => handleChangeOffsetCoordinates(e, "z")}
                       fullWidth
                     />
                   </RowContainer>

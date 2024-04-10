@@ -9,7 +9,6 @@ const MAX_SPLINE_TOTAL_DISTANCE = 80; // Distância total máxima de spline
 const MIN_SPLINE_POINTS = 4; // Número mínimo de pontos para spline
 const MAX_SPLINE_POINTS = 12; // Número máximo de pontos para spline
 const MAX_LINES = 50000; // Número máximo de linhas de GCode
-const VERTICAL_OFFSET = 0; // Offset vertical para movimentos de Z
 
 interface Coordinates {
   originalIndex: number;
@@ -69,7 +68,8 @@ const calculateDistanceBetweenMultiplePoints = (
 
 const formatCoordinates = (
   coordinates: Coordinates[],
-  initialCoordinates: { x: number; y: number; z: number }
+  initialCoordinates: { x: number; y: number; z: number },
+  offsetCoordinates: { x: number; y: number; z: number }
 ): string[] => {
   return [
     `C00000=${initialCoordinates.x.toFixed(3)},${initialCoordinates.y.toFixed(
@@ -80,9 +80,9 @@ const formatCoordinates = (
       const RY = -0.0;
       const RZ = 0.0;
 
-      const X = coord.X?.toFixed(3) ?? "0.000";
-      const Y = coord.Y?.toFixed(3) ?? "0.000";
-      const Z = ((coord.Z || 0) - VERTICAL_OFFSET)?.toFixed(3) ?? "0.000";
+      const X = ((coord.X || 0) + offsetCoordinates.x)?.toFixed(3) ?? "0.000";
+      const Y = ((coord.Y || 0) + offsetCoordinates.y)?.toFixed(3) ?? "0.000";
+      const Z = ((coord.Z || 0) + offsetCoordinates.z)?.toFixed(3) ?? "0.000";
 
       return `C${(1 + coord.newIndex)
         .toString()
@@ -218,11 +218,17 @@ export const processGCode = (
   preferences: {
     useCircleOptimization: boolean;
     initialCoordinates: { x: number; y: number; z: number };
+    offsetCoordinates: { x: number; y: number; z: number };
     speed: number;
   }
 ): string[] => {
   // Desestruturação das preferências de processamento
-  const { useCircleOptimization, initialCoordinates, speed } = preferences;
+  const {
+    useCircleOptimization,
+    initialCoordinates,
+    offsetCoordinates,
+    speed,
+  } = preferences;
 
   // Criação de um conjunto de coordenadas de movimento a partir das linhas de GCode
   const g1g0 = getG1G0(gcodeLines.splice(0, MAX_LINES));
@@ -400,11 +406,26 @@ export const processGCode = (
     }
   }
 
+  // Remove quaisquer coordenadas que podem ter ficado com algum nulo
+  movementCoordinates = movementCoordinates.filter(
+    (coord) =>
+      coord.X !== undefined &&
+      coord.Y !== undefined &&
+      coord.Z !== undefined &&
+      coord.X !== 0 &&
+      coord.Y !== 0 &&
+      coord.Z !== 0 &&
+      !Number.isNaN(coord.X) &&
+      !Number.isNaN(coord.Y) &&
+      !Number.isNaN(coord.Z)
+  );
+
   // Formata as coordenadas de movimento para o formato de arquivo de movimento
   // Formata os movimentos lineares e de spline
   const coordinateSet = formatCoordinates(
     movementCoordinates,
-    initialCoordinates
+    initialCoordinates,
+    offsetCoordinates
   );
   let movementSet: string[] = [];
 
