@@ -102,7 +102,7 @@ const RowContainer = styled(Box)`
 const baseHeader = `/JOB
 //NAME output
 //POS
-///NPOS 1745,0,0,0,0,0
+///NPOS 4999,0,0,0,0,0
 ///TOOL 10
 ///POSTYPE PULSE
 ///PULSE
@@ -196,7 +196,7 @@ export const GCodeConversor: React.FC = () => {
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
     axis: "x" | "y" | "z"
   ) => {
-    const cleanedValue = e.target.value.replace(/[^0-9]/g, "");
+    const cleanedValue = e.target.value.replace(/[^0-9-]|(?<=.)-/g, "");
 
     setInitialCoordinates({
       ...initialCoordinates,
@@ -208,7 +208,7 @@ export const GCodeConversor: React.FC = () => {
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
     axis: "x" | "y" | "z"
   ) => {
-    const cleanedValue = e.target.value.replace(/[^0-9]/g, "");
+    const cleanedValue = e.target.value.replace(/[^0-9-]|(?<=.)-/g, "");
 
     setOffsetCoordinates({
       ...offsetCoordinates,
